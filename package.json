@@ -3,10 +3,15 @@
   "version": "1.0.50",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "NODE_ENV=development bun run --watch src/index.ts",
+    "start": "NODE_ENV=production bun run src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "@elysiajs/bearer": "^1.1.1",
+    "@elysiajs/cors": "^1.1.0",
+    "elysia": "^1.1.4",
+    "firebase-admin": "^12.2.0",
+    "mongoose": "^8.5.1"
   },
   "devDependencies": {
     "bun-types": "latest"
