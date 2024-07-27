@@ -1,6 +1,6 @@
 import { StatusMap } from "elysia";
 import { HTTPHeaders } from "elysia/dist/types";
-import * as admin from "firebase-admin";
+import admin from "firebase-admin";
 
 type args = {
   bearer: string | undefined;
@@ -8,9 +8,10 @@ type args = {
     headers: HTTPHeaders;
     status?: number | keyof StatusMap;
   };
+  headers: Record<string, string | undefined>;
 };
 
-export async function onFirebaseAuth({ bearer, set }: args) {
+export async function onFirebaseAuth({ bearer, headers, set }: args) {
   if (!bearer) {
     set.status = 400;
     set.headers[
@@ -22,7 +23,7 @@ export async function onFirebaseAuth({ bearer, set }: args) {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(bearer);
-    set.headers["userEmail"] = decodedToken.email!; // Add the decoded user email to the request headers
+    headers["userEmail"] = decodedToken.email!; // Add the decoded user email to the request headers
   } catch (error) {
     set.status = 401;
     set.headers[

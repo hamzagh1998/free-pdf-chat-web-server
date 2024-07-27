@@ -8,6 +8,7 @@ import { configuration } from "./config";
 import { auth } from "./controllers/auth";
 
 import { onFirebaseAuth } from "./hooks/on-firebase-auth";
+
 import { connectDB } from "./db/connect-db";
 
 const firebaseConfig = configuration.firebaseAppConfig;
@@ -27,10 +28,10 @@ await connectDB(DB_URI);
 const app = new Elysia()
   .use(cors())
   .use(bearer())
+  .onBeforeHandle(onFirebaseAuth) // Check if the user is authenticated from firebase
   .get("/", () => ({
     msg: "Healthy!",
   }))
-  .onBeforeHandle(onFirebaseAuth) // Check if the user is authenticated from firebase
   .use(auth)
   .listen(PORT);
 
