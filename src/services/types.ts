@@ -1,5 +1,5 @@
-export type ReturnType = Promise<{
+export type ReturnType<T> = Promise<{
   error: boolean;
-  detail: unknown;
+  detail: T;
   status?: number;
 }>;

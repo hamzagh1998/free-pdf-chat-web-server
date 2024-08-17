@@ -7,3 +7,21 @@ export const signupDTO = t.Object({
   photoURL: t.Optional(t.String()),
   plan: t.String({ default: "free" }),
 });
+
+export type SignUp = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  photoURL?: string;
+  plan: string;
+};
+
+export type UserData = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  photoURL: string;
+  plan: string;
+  memoryUsageInMB: number;
+};

@@ -23,6 +23,7 @@ export async function onFirebaseAuth({ bearer, headers, set }: args) {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(bearer);
+
     headers["userEmail"] = decodedToken.email
       ? decodedToken.email
       : decodedToken.user_id; // Add the decoded user email/user_id to the request headers

@@ -3,27 +3,27 @@ import { Elysia } from "elysia";
 import { signupDTO } from "../schemas/auth";
 
 import { AuthService } from "../services/auth";
+import { Common } from "../services/common";
 
 export const auth = new Elysia({ prefix: "/auth", name: "auth" })
   .post(
     "/signup",
     async ({ set, body: { email, firstName, lastName, photoURL, plan } }) => {
-      const result = await AuthService.signUp({
+      const { detail, status } = await AuthService.signUp({
         email,
         firstName,
         lastName,
         photoURL,
         plan,
       });
-      if (result.error) {
-        set.status = result.status;
-      }
-      return result.detail;
+      set.status = status;
+      return detail;
     },
     {
-      body: signupDTO,
+      body: signupDTO, // validate the request body
       beforeHandle: async ({ body, set }) => {
-        if (await AuthService.isUserExists(body.email)) {
+        // check if the user already exists
+        if (await Common.isUserExists(body.email)) {
           set.status = 409;
           return { detail: "User already exists" };
         }

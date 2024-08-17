@@ -6,7 +6,6 @@ type PdfFile = {
   owner: Schema.Types.ObjectId;
   sizeInMB: number;
   createdAt: Date;
-  uploadedAt: Date | null;
 };
 
 type PdfFileDocument = PdfFile & Document;
@@ -32,10 +31,6 @@ const PdfFileSchema = new Schema<PdfFileDocument>({
   createdAt: {
     type: Date,
     default: Date.now,
-  },
-  uploadedAt: {
-    type: Date || null,
-    default: null,
   },
 });
 

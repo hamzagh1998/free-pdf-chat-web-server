@@ -4,7 +4,7 @@ type Conversation = {
   name: string;
   owner: Schema.Types.ObjectId;
   participants: Schema.Types.ObjectId[];
-  pdfFle: Schema.Types.ObjectId;
+  pdfFile: Schema.Types.ObjectId;
   isPublic: boolean;
   isArchived: boolean;
   createdAt: Date;
@@ -27,7 +27,7 @@ const ConversationSchema = new Schema<ConversationDocument>({
     ref: "User",
     required: true,
   },
-  pdfFle: {
+  pdfFile: {
     type: Schema.Types.ObjectId,
     ref: "PdfFile",
     required: true,

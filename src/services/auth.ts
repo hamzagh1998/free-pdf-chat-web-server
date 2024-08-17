@@ -1,38 +1,22 @@
-import { pdfFileRepository } from "../db/pdf-file-repository";
 import { userRepository } from "../db/user-repository";
-import { PdfFileDocument } from "../models/pdf-file";
 import { UserDocument } from "../models/user";
+
+import { SignUp, UserData } from "../schemas/auth";
+
+import { Common } from "./common";
 
 import { ReturnType } from "./types";
 
 import { tryToCatch } from "../utils/try-to-catch";
 
-type SignUp = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  photoURL?: string;
-  plan: string;
-};
-
-type userData = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  photoURL: string;
-  plan: string;
-  memoryUsageInMB: number;
-};
-
-export abstract class AuthService {
+export abstract class AuthService extends Common {
   static async signUp({
     firstName,
     lastName,
     email,
     photoURL,
     plan,
-  }: SignUp): ReturnType {
+  }: SignUp): ReturnType<unknown> {
     const avatar = photoURL
       ? photoURL
       : `https://api.dicebear.com/6.x/initials/svg?radius=50&seed=${firstName} ${lastName}`;
@@ -54,9 +38,7 @@ export abstract class AuthService {
     return this.getUserData(userDoc!.email);
   }
 
-  static async getUserData(email: string): ReturnType {
-    let data: userData;
-
+  static async getUserData(email: string): ReturnType<UserData | unknown> {
     const [userError, userDoc] = await tryToCatch<UserDocument | null>(
       (email: string) => userRepository.findOne({ email }),
       email
@@ -70,42 +52,32 @@ export abstract class AuthService {
       return { error: true, detail: "User not found!", status: 404 };
     }
 
-    const [pdfFileError, pdfFiledocs] = await tryToCatch<
-      PdfFileDocument[] | null
-    >(
-      (userId: string) => pdfFileRepository.find({ owner: userId }),
-      userDoc._id
+    const userFilesData = await this.getUserFileUsageInMB(
+      userDoc._id as string
     );
-    if (pdfFileError) {
-      console.error(
-        "An error occured while getting user pdf files: ",
-        pdfFileError
-      );
-      return { error: true, detail: "Unexpected error occurred!", status: 500 };
+
+    if (userFilesData.error) {
+      return userFilesData;
     }
 
-    if (!pdfFiledocs || !pdfFiledocs?.length) {
-      data = {
-        ...userDoc,
-        id: userDoc._id as string,
-        memoryUsageInMB: 0,
-      };
-      return { error: false, detail: data };
+    const conversationsData = await this.getUserConversations(
+      userDoc._id as string
+    );
+
+    if (conversationsData.error) {
+      return conversationsData;
     }
+
+    const { _id, ...rest } = userDoc;
+
     return {
       error: false,
       detail: {
-        ...userDoc,
-        id: userDoc._id as string,
-        memoryUsageInMB: pdfFiledocs.reduce(
-          (sum, doc) => sum + doc.sizeInMB,
-          0
-        ),
+        ...rest,
+        id: _id,
+        storageUsageInMb: userFilesData.detail,
+        conversations: conversationsData.detail,
       },
     };
-  }
-
-  static async isUserExists(email: string) {
-    return !!(await userRepository.findOne({ email }));
   }
 }
