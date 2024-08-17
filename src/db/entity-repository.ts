@@ -30,7 +30,7 @@ export abstract class EntityRepository<T extends Document> {
         __v: 0,
         ...projctions,
       })
-      .exec();
+      .lean();
   }
 
   async find(
@@ -42,18 +42,16 @@ export abstract class EntityRepository<T extends Document> {
         __v: 0,
         ...projctions,
       })
-      .exec();
+      .lean();
   }
 
   async findOneAndUpdate(
     entityFilterQuery: FilterQuery<T>,
     updateEndtityData: UpdateQuery<unknown>
   ): Promise<T | null> {
-    return this.entityModel.findOneAndUpdate(
-      entityFilterQuery,
-      updateEndtityData,
-      { new: true }
-    );
+    return this.entityModel
+      .findOneAndUpdate(entityFilterQuery, updateEndtityData, { new: true })
+      .lean();
   }
 
   async deleteMany(entityFilterQuery: FilterQuery<T>): Promise<boolean> {

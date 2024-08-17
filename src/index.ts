@@ -5,11 +5,12 @@ import admin from "firebase-admin";
 
 import { configuration } from "./config";
 
-import { auth } from "./controllers/auth";
-
 import { onFirebaseAuth } from "./hooks/on-firebase-auth";
 
 import { connectDB } from "./db/connect-db";
+
+import { auth } from "./controllers/auth";
+import { conversation } from "./controllers/conversations";
 
 const firebaseConfig = configuration.firebaseAppConfig;
 admin.initializeApp({
@@ -33,6 +34,7 @@ const app = new Elysia()
     msg: "Healthy!",
   }))
   .use(auth)
+  .use(conversation)
   .listen(PORT);
 
 console.info(

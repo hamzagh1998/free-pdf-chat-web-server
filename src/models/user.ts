@@ -4,7 +4,9 @@ type User = {
   firstName: string;
   lastName: string;
   email: string;
+  plan: string;
   photoURL: string;
+  storageUsageInMb: number;
   createdAt: Date;
   updatedAt: Date | null;
 };
@@ -28,6 +30,16 @@ const UserSchema = new Schema<UserDocument>({
   photoURL: {
     type: String,
     required: true,
+  },
+  storageUsageInMb: {
+    type: Number,
+    required: true,
+    default: 0,
+  },
+  plan: {
+    type: String,
+    required: true,
+    default: "free",
   },
   createdAt: {
     type: Date,
