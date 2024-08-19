@@ -10,7 +10,7 @@ import { onFirebaseAuth } from "./hooks/on-firebase-auth";
 import { connectDB } from "./db/connect-db";
 
 import { auth } from "./controllers/auth";
-import { conversation } from "./controllers/conversations";
+import { conversation } from "./controllers/conversation";
 
 const firebaseConfig = configuration.firebaseAppConfig;
 admin.initializeApp({

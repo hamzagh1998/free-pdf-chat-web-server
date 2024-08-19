@@ -5,9 +5,10 @@ import { PdfFileDocument } from "../models/pdf-file";
 
 import { ReturnType } from "./types";
 
-import { tryToCatch } from "../utils/try-to-catch";
 import { conversationRepository } from "../db/conversation-repository";
 import { ConversationDocument } from "../models/conversation";
+
+import { tryToCatch } from "../utils/try-to-catch";
 
 export class Common {
   static async isUserExists(email: string) {
@@ -38,7 +39,7 @@ export class Common {
   }
 
   static async getUserConversations(userId: string) {
-    const [error, conversations] = await tryToCatch<
+    const [error, conversationsDocs] = await tryToCatch<
       ConversationDocument[] | null
     >(
       (userId: string) =>
@@ -56,10 +57,44 @@ export class Common {
       return { error: true, detail: "Unexpected error occurred!", status: 500 };
     }
 
-    if (!conversations || !conversations?.length) {
+    if (!conversationsDocs || !conversationsDocs?.length) {
       return { error: false, detail: [] };
     }
 
-    return { error: false, detail: conversations };
+    const conversationsPdfIds = conversationsDocs.map(
+      (conversationDoc) => conversationDoc.pdfFile
+    );
+
+    const [pdfFilesError, pdfFiles] = await tryToCatch<
+      PdfFileDocument[] | null
+    >(
+      (pdfIds: string[]) => pdfFileRepository.find({ _id: { $in: pdfIds } }),
+      conversationsPdfIds
+    );
+
+    if (pdfFilesError) {
+      console.error(
+        "An error occured while getting conversations pdf: ",
+        error
+      );
+      return { error: true, detail: "Unexpected error occurred!", status: 500 };
+    }
+
+    // Map pdf files to conversations
+    const conversationsWithPdfFileURL = conversationsDocs.map(
+      (conversationDoc) => {
+        const pdfFile = pdfFiles?.find(
+          (pdfFile) =>
+            pdfFile._id!.toString() === conversationDoc.pdfFile.toString()
+        );
+
+        if (pdfFile) {
+          return { ...conversationDoc, pdfFileURL: pdfFile.url };
+        }
+        return conversationDoc;
+      }
+    );
+
+    return { error: false, detail: conversationsWithPdfFileURL };
   }
 }
