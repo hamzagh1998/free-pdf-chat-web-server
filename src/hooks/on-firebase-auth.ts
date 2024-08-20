@@ -12,6 +12,8 @@ type args = {
 };
 
 export async function onFirebaseAuth({ bearer, headers, set }: args) {
+  if (headers.upgrade === "websocket") return; // Skip the authentication for WebSocket connections
+
   if (!bearer) {
     set.status = 400;
     set.headers[

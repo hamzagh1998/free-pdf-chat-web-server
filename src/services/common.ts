@@ -97,4 +97,57 @@ export class Common {
 
     return { error: false, detail: conversationsWithPdfFileURL };
   }
+
+  static async getConversation(conversationId: string) {
+    const [error, conversationDoc] =
+      await tryToCatch<ConversationDocument | null>(
+        (conversationId: string) =>
+          conversationRepository.findOne({ _id: conversationId }),
+        conversationId
+      );
+
+    if (error) {
+      console.error(error);
+      return {
+        error: true,
+        status: 500,
+        detail: "Error while fetching conversation",
+      };
+    }
+
+    if (!conversationDoc) {
+      return {
+        error: true,
+        status: 404,
+        detail: "Conversation not found",
+      };
+    }
+
+    const [pdfFileError, pdfFileDoc] = await tryToCatch<PdfFileDocument | null>(
+      (pdfFileId: string) => pdfFileRepository.findOne({ _id: pdfFileId }),
+      conversationDoc.pdfFile
+    );
+
+    if (pdfFileError) {
+      console.error(pdfFileError);
+      return {
+        error: true,
+        status: 500,
+        detail: "Error while fetching pdf file",
+      };
+    }
+
+    if (!pdfFileDoc) {
+      return {
+        error: true,
+        status: 404,
+        detail: "Pdf file not found",
+      };
+    }
+
+    return {
+      error: false,
+      detail: { ...conversationDoc, pdfFileUrl: pdfFileDoc.url },
+    };
+  }
 }
