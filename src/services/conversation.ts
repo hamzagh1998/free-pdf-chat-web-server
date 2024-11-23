@@ -1,6 +1,6 @@
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
 import "pdfjs-dist/build/pdf.worker";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { userRepository } from "../db/user-repository";
 import { UserDocument } from "../models/user";
@@ -15,24 +15,17 @@ import { NewConversation } from "../schemas/converstaion";
 
 import { Common } from "./common";
 
+import { configuration } from "../config";
+
 import { tryToCatch } from "../utils/try-to-catch";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const genAI = new GoogleGenerativeAI(configuration.geminiApiKey);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-const aiResponse = async (content: string) => {
+const aiResponse = async (prompt: string) => {
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a knowledgeable assistant with access to the content of a PDF document. Use this information to answer questions related to the document.",
-        },
-        { role: "user", content },
-      ],
-    });
-    return completion.choices[0].message || "No response content";
+    const result = await model.generateContent(prompt);
+    return result.response.text() || "No response content";
   } catch (error) {
     console.error("Error in AI response:", error);
     throw error;
@@ -140,9 +133,20 @@ export abstract class ConversationService extends Common {
       MessageDocument[] | null
     >(
       (conversationId: string) =>
-        messageRepository.find({ conversationId }, { __v: 0 }),
+        messageRepository.find({ conversation: conversationId }, { __v: 0 }),
       conversationId
     );
+
+    const [error, participants] = await tryToCatch<UserDocument[] | null>(() =>
+      userRepository.find(
+        { _id: { $in: (conversationDoc.detail as any).participants } },
+        { __v: 0, email: 0, plan: 0, updatedAt: 0 }
+      )
+    );
+    if (error) {
+      console.error("Error while fetching participants: ", error);
+      return { error: true, detail: "Unexpected error occurred!", status: 500 };
+    }
 
     if (messagesError) {
       console.error(
@@ -152,12 +156,28 @@ export abstract class ConversationService extends Common {
       return { error: true, detail: "Unexpected error occurred!", status: 500 };
     }
 
+    const messages = messagesDocs!.map((messageDoc) =>
+      participants!.find(
+        (participant) =>
+          (participant._id as any).toString() === messageDoc.sender.toString()
+      )
+        ? {
+            ...messageDoc,
+            sender: participants!.find(
+              (participant) =>
+                (participant._id as any).toString() ===
+                messageDoc.sender.toString()
+            ),
+          }
+        : messageDoc
+    );
+
     return {
       error: false,
       status: 200,
       detail: {
-        messagesDocs,
-        users: (conversationDoc.detail as any).participants,
+        messages,
+        participants,
       },
     };
   }
@@ -190,26 +210,20 @@ export abstract class ConversationService extends Common {
 
     const parsedPDFText = await this.parsePDF(pdfFileURL);
 
-    //* Save Question: user
-    // const [error, messageDoc] = await tryToCatch<MessageDocument>(() =>
-    // );
-
     //* Save Answer: AI
     const prompt = `Here is the content of the PDF document:\n\n${parsedPDFText}\n\nUser's question: ${msg}`;
     const response = await aiResponse(prompt);
     await messageRepository.create({
-      conversationId,
+      conversation: conversationId,
       sender: userId,
       content: msg,
     });
     await messageRepository.create({
-      conversationId,
+      conversation: conversationId,
       sender: userId,
       content: response,
       isAiResponse: true,
     });
-
-    console.log(response);
   }
 
   private static async parsePDF(pdfFileURL: string) {

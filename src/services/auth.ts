@@ -1,3 +1,5 @@
+import { ObjectId } from "mongoose";
+
 import { userRepository } from "../db/user-repository";
 import { UserDocument } from "../models/user";
 
@@ -8,6 +10,7 @@ import { Common } from "./common";
 import { ReturnType } from "./types";
 
 import { tryToCatch } from "../utils/try-to-catch";
+import { ConversationDocument } from "../models/conversation";
 
 export abstract class AuthService extends Common {
   static async signUp({
@@ -44,7 +47,7 @@ export abstract class AuthService extends Common {
       email
     );
     if (userError) {
-      console.error("An error occured while getting user data: ", userError);
+      console.error("An error occurred while getting user data: ", userError);
       return { error: true, detail: "Unexpected error occurred!", status: 500 };
     }
 
@@ -68,16 +71,55 @@ export abstract class AuthService extends Common {
       return conversationsData;
     }
 
-    const { _id, ...rest } = userDoc;
+    const conversationIds = (conversationsData.detail as any)
+      .map((conversation: ConversationDocument) => conversation.participants)
+      .flat();
 
-    return {
-      error: false,
-      detail: {
-        ...rest,
-        id: _id,
-        storageUsageInMb: userFilesData.detail,
-        conversations: conversationsData.detail,
-      },
-    };
+    const [participantsError, participants] = await tryToCatch<
+      UserDocument[] | null
+    >(() =>
+      userRepository.find(
+        {
+          _id: { $in: conversationIds },
+        },
+        { __v: 0, email: 0, plan: 0, updatedAt: 0 }
+      )
+    );
+    if (participantsError) {
+      console.error("Error while fetching participants: ", participantsError);
+      return { error: true, detail: "Unexpected error occurred!", status: 500 };
+    }
+
+    if (participants) {
+      const participantsMap = new Map<string, UserDocument>(
+        participants.map((participant) => [
+          participant._id!.toString(),
+          participant,
+        ])
+      );
+
+      const conversationsWithParticipants = (
+        conversationsData.detail as any
+      ).map((conversation: ConversationDocument) => ({
+        ...conversation,
+        participants: conversation.participants.map((participantId: ObjectId) =>
+          participantsMap.get(participantId.toString())
+        ),
+      }));
+
+      const { _id, ...rest } = userDoc;
+
+      return {
+        error: false,
+        detail: {
+          ...rest,
+          id: _id,
+          storageUsageInMb: userFilesData.detail,
+          conversations: conversationsWithParticipants,
+        },
+      };
+    }
+
+    return { error: true, detail: "Unexpected error occurred!", status: 500 };
   }
 }

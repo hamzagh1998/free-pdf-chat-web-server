@@ -7,8 +7,11 @@ import { ReturnType } from "./types";
 
 import { conversationRepository } from "../db/conversation-repository";
 import { ConversationDocument } from "../models/conversation";
+import { messageRepository } from "../db/message-repository";
+import { MessageDocument } from "../models/messages";
 
 import { tryToCatch } from "../utils/try-to-catch";
+import { UserDocument } from "../models/user";
 
 export class Common {
   static async isUserExists(email: string) {
@@ -145,9 +148,22 @@ export class Common {
       };
     }
 
+    const [participantsError, participants] = await tryToCatch<
+      UserDocument[] | null
+    >(() =>
+      userRepository.find(
+        { _id: { $in: conversationDoc.participants } },
+        { __v: 0, email: 0, plan: 0, updatedAt: 0 }
+      )
+    );
+    if (participantsError) {
+      console.error("Error while fetching participants: ", participantsError);
+      return { error: true, detail: "Unexpected error occurred!", status: 500 };
+    }
+
     return {
       error: false,
-      detail: { ...conversationDoc, pdfFileUrl: pdfFileDoc.url },
+      detail: { ...conversationDoc, participants, pdfFileUrl: pdfFileDoc.url },
     };
   }
 }

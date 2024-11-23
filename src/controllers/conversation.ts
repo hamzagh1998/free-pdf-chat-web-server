@@ -15,6 +15,12 @@ export const conversation = new Elysia({
     idleTimeout: 30,
   },
 })
+  .get("/:id", async ({ set, params }) => {
+    const { status, detail } =
+      await ConversationService.getConversationMessages(params.id);
+    set.status = status;
+    return detail;
+  })
   .post(
     "/new",
     async ({ set, body }) => {
@@ -36,67 +42,105 @@ export const conversation = new Elysia({
   )
   .ws("/messages", {
     async open(ws: any) {
-      const fbToken = ws.data.query.token!;
-      const conversationId = ws.data.query.conversationId!;
-      if (!fbToken) ws.close();
-      try {
-        const decodedToken = await admin.auth().verifyIdToken(fbToken);
+      const fbToken = ws.data.query.token;
+      const conversationId = ws.data.query.conversationId;
 
-        ws.data.email = decodedToken?.email
-          ? decodedToken.email
-          : decodedToken.user_id;
-        const user = await userRepository.findOne({
-          email: ws.data.email,
-        });
-        const msg = `${
-          user?.firstName + " " + user?.lastName
-        } has entered the conversation`;
+      if (!fbToken || !conversationId) {
+        console.error("Missing token or conversationId, closing WebSocket");
+        return ws.close();
+      }
+
+      try {
+        // Verify Firebase token
+        const decodedToken = await admin.auth().verifyIdToken(fbToken);
+        ws.data.email = decodedToken?.email || decodedToken.user_id;
+
+        const user = await userRepository.findOne({ email: ws.data.email });
+
+        if (!user) {
+          console.error("User not found, closing WebSocket");
+          return ws.close();
+        }
+
+        const joinMessage = `${user.firstName || ""} ${
+          user.lastName || ""
+        } has entered the conversation.`;
+
+        // Fetch initial conversation messages
         const conversation = await ConversationService.getConversationMessages(
           conversationId
         );
-        ws.subscribe(conversationId);
+
         if (conversation.error) {
+          console.error("Error fetching conversation messages:", conversation);
           ws.publish(conversationId, {
             type: "notification",
-            content: "Error couldn't get conversation messages",
+            content: "Error couldn't get conversation messages.",
           });
-          console.error(
-            "Error while getting conversation messages",
-            conversation
-          );
-          ws.close();
+          return ws.close();
         }
-        ws.publish(conversationId, { type: "notification", content: msg });
+
+        // Subscribe to the conversation room
+        ws.subscribe(conversationId);
+
+        // Broadcast the join notification
         ws.publish(conversationId, {
-          type: "messages",
-          content: conversation.detail,
+          type: "notification",
+          content: joinMessage,
         });
       } catch (error) {
-        console.error("Error while verifying token", error);
+        console.error("Error during WebSocket open:", error);
         ws.close();
       }
     },
-    message(ws: any, message: any) {
-      // this is a group chat
-      // so the server re-broadcasts incoming message to everyone
-      const conversationId = ws.data.query.conversationId!;
-
-      if (message.type === "question") {
-        //TODO: Send the question to the AI
-        ConversationService.sendQuestion(
-          conversationId,
-          message.data.userId,
-          message.data.message
-        );
+    async message(ws: any, message: any) {
+      const conversationId = ws.data.query.conversationId;
+      if (!conversationId) {
+        console.error("Missing conversationId, ignoring message.");
+        return;
       }
 
-      ws.publish(conversationId, `${ws.data.email}: ${message}`);
+      try {
+        if (message.type === "question") {
+          // Save the question or perform other business logic
+          await ConversationService.sendQuestion(
+            conversationId,
+            message.data.userId,
+            message.data.message
+          );
+          const responseMessage = {
+            type: "messages",
+            content: message.data.message,
+          };
+
+          // Broadcast to all other subscribers
+          ws.publish(conversationId, responseMessage);
+
+          // Send back to the sender explicitly
+          ws.send(JSON.stringify(responseMessage));
+        }
+
+        if (message.type === "typing") {
+          ws.publish(conversationId, {
+            type: "typing",
+            content: message.data.message,
+          });
+        }
+      } catch (error) {
+        console.error("Error handling WebSocket message:", error);
+      }
     },
     close(ws: any) {
-      const conversationId = ws.data.query.conversationId!;
-      const msg = `${ws.data.email} has left the chat`;
+      const conversationId = ws.data.query.conversationId;
+      const userEmail = ws.data.email;
 
-      ws.unsubscribe(conversationId);
-      ws.publish(conversationId, msg);
+      if (conversationId && userEmail) {
+        const leaveMessage = `${userEmail} has left the chat.`;
+        ws.unsubscribe(conversationId);
+        ws.publish(conversationId, {
+          type: "notification",
+          content: leaveMessage,
+        });
+      }
     },
   });

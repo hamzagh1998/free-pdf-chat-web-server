@@ -31,9 +31,7 @@ export const auth = new Elysia({ prefix: "/auth", name: "auth" })
     }
   )
   .get("/user-data", async ({ set, headers }) => {
-    const result = await AuthService.getUserData(
-      headers["userEmail"] as string
-    );
+    const result = await AuthService.getUserData(headers["email"] as string);
     if (result.error) {
       set.status = result.status;
     }
