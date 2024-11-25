@@ -47,10 +47,10 @@ export abstract class EntityRepository<T extends Document> {
 
   async findOneAndUpdate(
     entityFilterQuery: FilterQuery<T>,
-    updateEndtityData: UpdateQuery<unknown>
+    updateEntityData: UpdateQuery<any>
   ): Promise<T | null> {
     return this.entityModel
-      .findOneAndUpdate(entityFilterQuery, updateEndtityData, { new: true })
+      .findOneAndUpdate(entityFilterQuery, updateEntityData, { new: true })
       .lean();
   }
 

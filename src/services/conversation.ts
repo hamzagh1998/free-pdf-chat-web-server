@@ -1,6 +1,7 @@
 import * as pdfjsLib from "pdfjs-dist/build/pdf";
 import "pdfjs-dist/build/pdf.worker";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { ObjectId } from "mongoose";
 
 import { userRepository } from "../db/user-repository";
 import { UserDocument } from "../models/user";
@@ -182,6 +183,46 @@ export abstract class ConversationService extends Common {
     };
   }
 
+  static async removeParticipantFromConversation(
+    conversationId: string,
+    userId: string
+  ) {
+    const conversationDoc = await this.getConversation(conversationId);
+
+    if (conversationDoc.error) {
+      console.error(conversationDoc.error);
+      return {
+        error: true,
+        status: 500,
+        detail: "Error while fetching conversation",
+      };
+    }
+
+    if (!conversationDoc) {
+      return {
+        error: true,
+        status: 404,
+        detail: "Conversation not found",
+      };
+    }
+
+    const [error] = await tryToCatch<ConversationDocument | null>(() =>
+      conversationRepository.findOneAndUpdate(
+        { _id: conversationId },
+        { $pull: { participants: userId } }
+      )
+    );
+
+    if (error) {
+      return { error: true, detail: "Unexpected error occurred!", status: 500 };
+    }
+
+    return {
+      error: false,
+      status: 203,
+      detail: "particpants removed successfully",
+    };
+  }
   static async sendQuestion(
     conversationId: string,
     userId: string,

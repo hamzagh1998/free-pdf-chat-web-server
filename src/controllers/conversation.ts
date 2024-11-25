@@ -7,6 +7,11 @@ import { Common } from "../services/common";
 import { ConversationService } from "../services/conversation";
 import { userRepository } from "../db/user-repository";
 
+interface RemoveParticipantParams {
+  conversationId: string;
+  userId: string;
+}
+
 // Adjust the type for WebSocket handlers
 export const conversation = new Elysia({
   prefix: "/conversation",
@@ -38,6 +43,25 @@ export const conversation = new Elysia({
           return { detail: "User doesn't exist" };
         }
       },
+    }
+  )
+  .patch(
+    "/remove-participant",
+    async ({ set, query }: { set: any; query: RemoveParticipantParams }) => {
+      const { conversationId, userId } = query;
+
+      if (!conversationId || !userId) {
+        set.status = 400;
+        return { detail: "Missing conversationId or userId" };
+      }
+
+      const { status, detail } =
+        await ConversationService.removeParticipantFromConversation(
+          conversationId,
+          userId
+        );
+      set.status = status;
+      return detail;
     }
   )
   .ws("/messages", {
